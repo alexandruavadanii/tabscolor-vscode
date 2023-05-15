@@ -62,7 +62,7 @@ function generateCssFile(context) {
   }
   for (const a in byDirectory) {
     if (a == "my/directory/") continue;
-    const title = a.replace(/\\/g, "\\\\");
+    const title = getPatternFromPath(a);
     style += `.tab[title*="${formatTitle(title)}" i]{background-color:${byDirectory[a].backgroundColor} !important; opacity: ${byDirectory[a].opacity || "0.6"};}
 				.tab[title*="${formatTitle(title)}" i] a,.tab[title*="${formatTitle(title)}" i] .monaco-icon-label:after,.tab[title*="${formatTitle(title)}" i] .monaco-icon-label:before{color:${byDirectory[a].fontColor} !important;}`;
   }
@@ -126,6 +126,16 @@ function generateCssFile(context) {
   }
 }
 
+function getPatternFromUri(a) {
+  //  if (a) is an Uri object, use its path to generate the css title pattern; otherwise, use the path opened in the current editor
+  let file = (a) ? (a.fsPath) : vscode.window.activeTextEditor?.document.uri.fsPath;
+  return getPatternFromPath(file);
+}
+
+function getPatternFromPath(path) {
+  return path.replace(/\\/g, "\\\\");
+}
+
 function setColor(context, color, title) {
   const storage = new Storage(context);
   if (storage.get("patchedBefore")) {
@@ -162,8 +172,7 @@ async function clearOpenTabColors(context) {
   const tabs = storage.get("tabs") || {};
   const editors = vscode.workspace.textDocuments;
   for (const editor of editors) {
-      const resource = editor.uri;
-      const fileName = resource.fsPath.replace(/\\/g, "\\\\");
+      const fileName = getPatternFromPath(editor.uri);
       for (const color in tabs) {
         if (tabs[color].includes(fileName)) {
           tabs[color] = tabs[color].filter(tab => tab !== fileName);
@@ -414,9 +423,7 @@ function activate(context) {
 
 
   disposable = vscode.commands.registerCommand('tabscolor.none', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    unsetColor(context, file.replace(/\\/g, "\\\\"));
+    unsetColor(context, getPatternFromUri(a));
   });
 
 
@@ -433,60 +440,38 @@ function activate(context) {
 
 
   disposable = vscode.commands.registerCommand('tabscolor.salmon', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "salmon", file.replace(/\\/g, "\\\\"));
+    setColor(context, "salmon", getPatternFromUri(a));
   });
 
-
   disposable = vscode.commands.registerCommand('tabscolor.green', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "green", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "green", getPatternFromUri(a));
   });
 
   disposable = vscode.commands.registerCommand('tabscolor.blue', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "blue", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "blue", getPatternFromUri(a));
   });
 
   disposable = vscode.commands.registerCommand('tabscolor.red', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "red", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "red", getPatternFromUri(a));
   });
 
   disposable = vscode.commands.registerCommand('tabscolor.orange', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "orange", file.replace(/\\/g, "\\\\"));
+    setColor(context, "orange", getPatternFromUri(a));
 
   });
   disposable = vscode.commands.registerCommand('tabscolor.yellow', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "yellow", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "yellow", getPatternFromUri(a));
   });
+
   disposable = vscode.commands.registerCommand('tabscolor.black', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "black", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "black", getPatternFromUri(a));
   });
+
   disposable = vscode.commands.registerCommand('tabscolor.white', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
-    setColor(context, "white", file.replace(/\\/g, "\\\\"));
-
+    setColor(context, "white", getPatternFromUri(a));
   });
+
   disposable = vscode.commands.registerCommand('tabscolor.randomColor', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
-    if (a) file = a.fsPath;
     const colorNames = Object.keys({ ...storage.get("customColors"), ...storage.get("defaultColors") });
     let colorName;
     do {
@@ -494,7 +479,7 @@ function activate(context) {
     }
     while (colorName === "none");
     vscode.window.showInformationMessage(`random color "${colorName}" set to current file`);
-    setColor(context, colorName, file.replace(/\\/g, "\\\\"));
+    setColor(context, colorName, getPatternFromUri(a));
 
   });
   disposable = vscode.commands.registerCommand('tabscolor.more', function (a, b) {
@@ -518,16 +503,13 @@ function activate(context) {
     ).then(color => {
       if (!color)
         return;
-      let file = vscode.window.activeTextEditor?.document.fileName;
-      if (a) file = a.fsPath;
-      setColor(context, color.label, file.replace(/\\/g, "\\\\"));
+      setColor(context, color.label, getPatternFromUri(a));
     });
   });
 
 
   // add color commands
   disposable = vscode.commands.registerCommand('tabscolor.addColor', function (a, b) {
-    let file = vscode.window.activeTextEditor?.document.fileName;
     const allColors = { ...storage.get("customColors"), ...storage.get("defaultColors") };
     // Create a new webview panel
     const panel = vscode.window.createWebviewPanel(
@@ -826,7 +808,7 @@ function activate(context) {
               background: message.colorBackground,
               color: message.colorText
             };
-            setColor(context, message.colorName, file.replace(/\\/g, "\\\\"));
+            setColor(context, message.colorName, getPatternFromUri(undefined));
             vscode.window.showInformationMessage(`Color "${message.colorName}" added`);
             return;
           }
@@ -863,7 +845,7 @@ function activate(context) {
         if (hasUseThisColor) {
           tabs[colorName].forEach((file) => {
             countFiles++;
-            unsetColor(context, file.replace(/\\/g, "\\\\"));
+            unsetColor(context, getPatternFromPath(file));
           });
           delete tabs[colorName];
           storage.set("tabs", tabs);
