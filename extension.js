@@ -12,7 +12,7 @@ const Storage = require("./modules/storage.js");
 const tabsColorLog = vscode.window.createOutputChannel("Tabs Color");
 let storage_ = null;
 
-
+const unixHomeDir = (os.platform() != "win32") ? (os.homedir() + '/') : undefined;
 
 function modulesPath(context) {
   return path.join(context.globalStoragePath, "modules");
@@ -22,12 +22,12 @@ function reloadCss() {
   vscode.window.showInformationMessage("---tab updated---");
 }
 
-function formatTitle(title) {
-  if (os.platform() != "win32") {
-    const homeDir = os.homedir() + '/';
-    title = title.replace(homeDir, "");
-  }
-  return title;
+function formatSelectors(title, selectorTemplateArr) {
+  let unixTitle = unixHomeDir ? title.replace(/\\\\/g, "/").replace(unixHomeDir, "") : title.replace(/\\\\/g, "/");
+  return selectorTemplateArr.map(function (s) {
+    return s.replace('__title__', title) + ',' +
+           s.replace('__title__', unixTitle);
+  }).join(',');
 }
 
 function generateCssFile(context) {
@@ -57,14 +57,26 @@ function generateCssFile(context) {
 
   for (const a in byFileType) {
     if (a == "filetype") continue;
-    style += `.tab[title$=".${formatTitle(a)}" i]{background-color:${byFileType[a].backgroundColor} !important; opacity:${byFileType[a].opacity || "0.6"};}
-				.tab[title$="${formatTitle(a)}" i] a,.tab[title$="${formatTitle(a)}" i] .monaco-icon-label:after,.tab[title$="${formatTitle(a)}" i] .monaco-icon-label:before{color:${byFileType[a].fontColor} !important;}`;
+    style += formatSelectors(a, [
+      '.tab[title$=".__title__" i]'
+    ]) + `{background-color:${byFileType[a].backgroundColor} !important; opacity:${byFileType[a].opacity || "0.6"};}`;
+    style += formatSelectors(a, [
+      '.tab[title$="__title__" i] a',
+      '.tab[title$="__title__" i] .monaco-icon-label:after',
+      '.tab[title$="__title__" i] .monaco-icon-label:before'
+    ]) + `{color:${byFileType[a].fontColor} !important;}`;
   }
   for (const a in byDirectory) {
     if (a == "my/directory/") continue;
     const title = getPatternFromPath(a);
-    style += `.tab[title*="${formatTitle(title)}" i]{background-color:${byDirectory[a].backgroundColor} !important; opacity: ${byDirectory[a].opacity || "0.6"};}
-				.tab[title*="${formatTitle(title)}" i] a,.tab[title*="${formatTitle(title)}" i] .monaco-icon-label:after,.tab[title*="${formatTitle(title)}" i] .monaco-icon-label:before{color:${byDirectory[a].fontColor} !important;}`;
+    style += formatSelectors(title, [
+      '.tab[title*="__title__" i]'
+    ]) + `{background-color:${byDirectory[a].backgroundColor} !important; opacity: ${byDirectory[a].opacity || "0.6"};}`;
+    style += formatSelectors(title, [
+      '.tab[title*="__title__" i] a',
+      '.tab[title*="__title__" i] .monaco-icon-label:after',
+      '.tab[title*="__title__" i] .monaco-icon-label:before'
+    ]) + `{color:${byDirectory[a].fontColor} !important;}`;
   }
   style += ".tab.active{opacity:1 !important}";
   if (activeTab.backgroundColor != "default") {
@@ -82,13 +94,21 @@ function generateCssFile(context) {
     const _fontColor = colorsData[i].color;
     const _opacity = colorsData[i].opacity || "0.6";
     const backgroundSelectorsArr = _colorTabs.map(function (a) {
-      return `.tab[title*="${formatTitle(a)}" i]`;
+      return formatSelectors(a, [
+        '.tab[title*="__title__" i]'
+      ]);
     });
     activeSelectorsArr.push(..._colorTabs.map(function (a) {
-      return `.tab[title*="${formatTitle(a)}" i].active`;
+      return  formatSelectors(a, [
+        '.tab[title*="__title__" i].active'
+      ]);
     }));
     const fontColorSelectorsArr = _colorTabs.map(function (a) {
-      return `.tab[title*="${formatTitle(a)}" i] a,.tab[title="${formatTitle(a)}" i] .monaco-icon-label:after,.tab[title*="${formatTitle(a)}" i] .monaco-icon-label:before`;
+      return formatSelectors(a, [
+        '.tab[title*="__title__" i] a',
+        '.tab[title="__title__" i] .monaco-icon-label:after',
+        '.tab[title*="__title__" i] .monaco-icon-label:before'
+      ]);
     });
     if (backgroundSelectorsArr.length > 0) {
       backgroundSelectors = backgroundSelectorsArr.join(",") + `{background-color:${_background} !important; opacity:${_opacity};}`;
@@ -133,7 +153,8 @@ function getPatternFromUri(a) {
 }
 
 function getPatternFromPath(path) {
-  return path.replace(/\\/g, "\\\\");
+  //  internally, we will use DOUBLE win32 path separators on *all* platforms, e.g. "C:\\path", "\\usr\\local"
+  return path.replace(/\//g, "\\").replace(/\\/g, "\\\\");
 }
 
 function setColor(context, color, title) {
